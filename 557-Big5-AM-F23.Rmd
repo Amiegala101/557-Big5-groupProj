@@ -1,0 +1,394 @@
+---
+title: "557-Big5-groupProj-AM-F23"
+author: "Amie Mackay"
+date: "2023-11-15"
+output: html_document
+---
+
+
+## Packages ## 
+```{r}
+library(skimr)
+library(psych)
+library(corrplot)  
+
+#library(tidyverse) #errors
+#library(dplyr)
+#library(ggplot2)
+#install.packages("corrplot")
+#library(corrplot)
+#library(skimr)
+#install.packages("Lock5Data")
+#library(Lock5Data)
+#help(Lock5Data)
+#library(readxl)
+# install.packages("FactoMineR") 
+#library(FactoMineR)              #PCA
+#library(stats)
+
+```
+
+## Dataset ## 
+```{r}
+#
+library(readr)
+#Raw dataset
+Big5_Raw <- read_table("~/Documents/Fall 2023/Psychometrics/Psychometrics - Final Project/Big5/Big5.csv")
+
+#Working datset
+# Big5 <- read_table("~/Documents/Fall 2023/Psychometrics/Psychometrics - Final Project/Big5/Big5.csv")
+
+Big5 <-Big5_Raw
+data <- Big5
+View(Big5) 
+View(Big5)
+```
+
+## Data - Outliers/Missing
+```{r}
+#Identified outlier/missing data 
+which(is.na(Big5))
+Big5_Raw <- Big5[-19065, ]
+Big5 <- Big5[-19065, ]
+
+which(is.na(Big5$O10))
+Big5_Raw <- Big5[-13304, ]
+Big5 <- Big5[-13304, ]
+```
+# OG - Factors w/ Uncorrected / original keyed items
+```{r}
+# Dataset - OG Factors - uncorrected variables  (before I flip the negatively keyed items and possibly EmoStability entirely)
+
+# Extraversion (E)
+ExtraversionOG <- Big5_Raw[, c("E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10")]
+
+# Neuroticism (N)
+NeuroticismOG <- Big5_Raw[, c("N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8", "N9", "N10")]
+
+# Agreeableness (A)
+AgreeablenessOG <- Big5_Raw[, c("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10")]
+
+# Conscientiousness (C)
+ConscientiousnessOG <- Big5_Raw[, c("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10")]
+
+# Openness (O)
+OpennessOG <- Big5_Raw[, c("O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O9", "O10")]
+
+# Combining the data frames into one
+Big5_OGfactors <- cbind(ExtraversionOG, NeuroticismOG, AgreeablenessOG, ConscientiousnessOG, OpennessOG)
+
+# If you want to check the structure of the new data frame
+str(Big5_OGfactors)
+```
+Misc code book info
+```{r}
+ names(Big5)
+ [1] "race"    "age"     "engnat"  "gender"  "hand"    "source"  "country" "E1"      "E2"      "E3"      "E4"      "E5"     
+[13] "E6"      "E7"      "E8"      "E9"      "E10"     "N1"      "N2"      "N3"      "N4"      "N5"      "N6"      "N7"     
+[25] "N8"      "N9"      "N10"     "A1"      "A2"      "A3"      "A4"      "A5"      "A6"      "A7"      "A8"      "A9"     
+[37] "A10"     "C1"      "C2"      "C3"      "C4"      "C5"      "C6"      "C7"      "C8"      "C9"      "C10"     "O1"     
+[49] "O2"      "O3"      "O4"      "O5"      "O6"      "O7"      "O8"      "O9"      "O10" 
+
+## race	Chosen from a drop down menu. 
+1=Mixed Race, 2=Arctic (Siberian, Eskimo), 
+3=Caucasian (European), 
+4=Caucasian (Indian), 
+5=Caucasian (Middle East), 
+6=Caucasian (North African, Other), 
+7=Indigenous Australian, 
+8=Native American, 
+9=North East Asian (Mongol, Tibetan, Korean Japanese, etc), 
+10=Pacific (Polynesian, Micronesian, etc), 
+11=South East Asian (Chinese, Thai, Malay, Filipino, etc), 
+12=West African, Bushmen, Ethiopian, 
+13=Other (0=missed)
+
+
+##  age	entered as text - (individuals reporting age < 13 were not recorded)
+## engnat	Response to "is English your native language?". 1=yes, 2=no (0=missed)
+
+## gender	- Chosen from a drop down menu. 
+1=Male, 
+2=Female, 
+3=Other (0=missed)
+hand	"What hand do you use to write with?". 1=Right, 2=Left, 3=Both (0=missed)
+
+```
+
+## Data Summaries## 
+```{r}
+skim(Big5)
+head(Big5)
+describe(Big5)
+str(Big5)
+hist(Big5$age)
+summary(Big5)
+summary(Big5_Raw)
+table(Extraversion)
+table(Big5$E2)
+table(Big5$E3)
+table(Big5$E4)
+table(Big5$E5)
+table(Big5$O10)
+order(Big5$E4)
+plot(Big5$O10)
+```
+
+#WTF outlier
+```{r}
+# Replace the value '6' with NA in the E2 column
+Big5$E2[Big5$O == 6] <- NA
+Big5$E3[Big5$E3 == 0] <- NA
+
+# Re-check the table
+table(Big5$E2, useNA = "ifany")
+```
+
+```{r}
+table(Big5$country)
+## - engnat	Response to "is English your native language?". 1=yes, 2=no (0=missed)
+table(Big5$engnat)
+ # 0 - 70
+ # 1 - 12379
+ # 2 - 7270
+```
+
+## Recode = attempt 1
+```{r}
+## Re-key items 
+# Function to reverse the scale
+reverse_scale <- function(x) {
+  6 - x
+}
+
+# Recoding negatively keyed items for Extraversion
+Big5$E2 <- reverse_scale(Big5$E2)
+Big5$E4 <- reverse_scale(Big5$E4)
+Big5$E6 <- reverse_scale(Big5$E6)
+Big5$E8 <- reverse_scale(Big5$E8)
+Big5$E10 <- reverse_scale(Big5$E10)
+
+# Recoding negatively keyed items for Agreeableness
+Big5$A1 <- reverse_scale(Big5$A1)
+Big5$A3 <- reverse_scale(Big5$A3)
+Big5$A5 <- reverse_scale(Big5$A5)
+Big5$A7 <- reverse_scale(Big5$A7)
+
+# Recoding negatively keyed items for Conscientiousness
+Big5$C2 <- reverse_scale(Big5$C2)
+Big5$C4 <- reverse_scale(Big5$C4)
+Big5$C6 <- reverse_scale(Big5$C6)
+Big5$C8 <- reverse_scale(Big5$C8)
+
+# Recoding negatively keyed items for Openness
+Big5$O2 <- reverse_scale(Big5$O2)
+Big5$O4 <- reverse_scale(Big5$O4)
+Big5$O6 <- reverse_scale(Big5$O6)
+
+# Recoding negatively keyed items for Neuroticism
+Big5$N1 <- reverse_scale(Big5$N1)
+Big5$N3 <- reverse_scale(Big5$N3)
+Big5$N5 <- reverse_scale(Big5$N5)
+Big5$N6 <- reverse_scale(Big5$N6)
+Big5$N7 <- reverse_scale(Big5$N7)
+Big5$N8 <- reverse_scale(Big5$N8)
+Big5$N9 <- reverse_scale(Big5$N9)
+Big5$N10 <- reverse_scale(Big5$N10)
+
+head(Big5_Raw)
+head(Big5) #Verified that they are flipped
+```
+
+## Recode = attempt 2
+```{r}
+# - Recode your negatively keyed items
+# Load the car package
+library(car)
+
+# Recoding negatively keyed items for Extraversion
+Big5$E2 <- recode(Big5$E2, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$E4 <- recode(Big5$E4, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$E6 <- recode(Big5$E6, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$E8 <- recode(Big5$E8, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$E10 <- recode(Big5$E10, '1=5; 2=4; 3=3; 4=2; 5=1')
+
+# Recoding negatively keyed items for Agreeableness
+Big5$A1 <- recode(Big5$A1, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$A3 <- recode(Big5$A3, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$A5 <- recode(Big5$A5, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$A7 <- recode(Big5$A7, '1=5; 2=4; 3=3; 4=2; 5=1')
+
+# Recoding negatively keyed items for Conscientiousness
+Big5$C2 <- recode(Big5$C2, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$C4 <- recode(Big5$C4, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$C6 <- recode(Big5$C6, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$C8 <- recode(Big5$C8, '1=5; 2=4; 3=3; 4=2; 5=1')
+
+# Recoding negatively keyed items for Openness
+Big5$O2 <- recode(Big5$O2, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$O4 <- recode(Big5$O4, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$O6 <- recode(Big5$O6, '1=5; 2=4; 3=3; 4=2; 5=1')
+
+# Recoding negatively keyed items for Neuroticism
+Big5$N1 <- recode(Big5$N1, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$N3 <- recode(Big5$N3, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$N5 <- recode(Big5$N5, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$N6 <- recode(Big5$N6, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$N7 <- recode(Big5$N7, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$N8 <- recode(Big5$N8, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$N9 <- recode(Big5$N9, '1=5; 2=4; 3=3; 4=2; 5=1')
+Big5$N10 <- recode(Big5$N10, '1=5; 2=4; 3=3; 4=2; 5=1')
+```
+
+# Data - Factors w CORRECTED/flipped/reverse-coded variables 
+```{r}
+# Extraversion (E)
+Extraversion <- Big5[, c("E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "E9", "E10")]
+
+# Neuroticism (N)
+Neuroticism <- Big5[, c("N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8", "N9", "N10")]
+
+# Agreeableness (A)
+Agreeableness <- Big5[, c("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10")]
+
+# Conscientiousness (C)
+Conscientiousness <- Big5[, c("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10")]
+
+# Openness (O)
+Openness <- Big5[, c("O1", "O2", "O3", "O4", "O5", "O6", "O7", "O8", "O9", "O10")]
+
+# Combining the data frames into one
+Big5_factors <- cbind(Extraversion, Neuroticism, Agreeableness, Conscientiousness, Openness)
+
+# If you want to check the structure of the new data frame
+str(Big5_factors)
+```
+
+## - Now, on to corrplots - Polychoric correlation matrix
+```{r}
+install.packages("ggcorrplot")
+library(ggcorrplot)
+
+# Save the polychoric correlation matrix
+#polychoric(x = Dat2, na.rm=TRUE) # tau information 
+cormat.0 <- psych::polychoric(x = Big5_OGfactors, na.rm=TRUE)$rho   #original, raw, uncorrected, negative-keyed items
+cormat <- psych::polychoric(x = Big5_factors, na.rm=TRUE)$rho      ###Raw, corrected for negative-keyed items 
+#psych::polychoric(x = Dat2, na.rm=TRUE)  #Threshold information. Might not need this? 
+
+#Checking
+head(round(cormat,2))
+cons <-(round(cormat,2))
+
+# Print the correlation matrix
+print(round(cormat,2))   #polychoric correlation matrix plot
+par(mfrow=c(2,1))
+
+### Raw cormat with original, negative-keyed items 
+ggcorrplot::ggcorrplot(corr = cormat.0, # correlation matrix
+                       type = "lower", # print only the lower part of the correlation matrix
+                       show.diag = TRUE, # show the diagonal values of 1
+                       lab = FALSE, # add correlation values as labels
+                       lab_size = 3) +
+                           ggtitle("Polychoric Correlation Matrix - Big5_Raw") + 
+  labs(subtitle = "Big5 - Raw Data with Negative Keyed Items")  # Size of the labels
+
+### Raw cormat with corrected, reverse-coded variables
+ggcorrplot::ggcorrplot(corr = cormat, # correlation matrix
+                       type = "lower", # print only the lower part of the correlation matrix
+                       show.diag = TRUE, # show the diagonal values of 1
+                       lab = FALSE, # add correlation values as labels
+                       lab_size = 3) +
+                           ggtitle("Polychoric Correlation Matrix - Big5") + 
+  labs(subtitle = " Big5 - Corrected for Negatively Keyed Items")  # Size of the labels
+           # Factors w CORRECTED/flipped/reverse-coded variables Raw Data 
+
+
+### NOTE: i'm not sure why these correlations look strange 
+```
+## Factors - Correlation Matrices - uncorrected, OG data 
+
+```{r}
+# Assuming you have created the Extraversion, Neuroticism, Agreeableness, Conscientiousness, and Openness data frames
+
+# Compute Correlation Matrices
+cor_ExtraversionOG <- cor(ExtraversionOG, use = "complete.obs")
+cor_NeuroticismOG <- cor(NeuroticismOG, use = "complete.obs")
+cor_AgreeablenessOG <- cor(AgreeablenessOG, use = "complete.obs")
+cor_ConscientiousnessOG <- cor(ConscientiousnessOG, use = "complete.obs")
+cor_OpennessOG <- cor(OpennessOG, use = "complete.obs")
+
+# Heatmap for Extraversion
+ggcorrplot::ggcorrplot(cor_ExtraversionOG, 
+                       type = "lower", 
+                       lab = TRUE) +
+  ggtitle("Correlation Matrix - Extraversion OG")
+
+# Heatmap for Neuroticism
+ggcorrplot::ggcorrplot(cor_NeuroticismOG, 
+                       type = "lower", 
+                       lab = TRUE) +
+  ggtitle("Correlation Matrix - Neuroticism OG")
+
+# Heatmap for Agreeableness
+ggcorrplot::ggcorrplot(cor_AgreeablenessOG, 
+                       type = "lower", 
+                       lab = TRUE) +
+  ggtitle("Correlation Matrix - Agreeableness OG")
+
+# Heatmap for Conscientiousness
+ggcorrplot::ggcorrplot(cor_ConscientiousnessOG, 
+                       type = "lower", 
+                       lab = TRUE) +
+  ggtitle("Correlation Matrix - Conscientiousness OG")
+
+# Heatmap for Openness
+ggcorrplot::ggcorrplot(cor_OpennessOG, 
+                       type = "lower", 
+                       lab = TRUE) +
+  ggtitle("Correlation Matrix - Openness OG")
+
+
+```
+
+```{r}
+# Assuming you have created the Extraversion, Neuroticism, Agreeableness, Conscientiousness, and Openness data frames
+
+# Compute Correlation Matrices
+cor_Extraversion <- cor(Extraversion, use = "complete.obs")
+cor_Neuroticism <- cor(Neuroticism, use = "complete.obs")
+cor_Agreeableness <- cor(Agreeableness, use = "complete.obs")
+cor_Conscientiousness <- cor(Conscientiousness, use = "complete.obs")
+cor_Openness <- cor(Openness, use = "complete.obs")
+
+# Heatmap for Extraversion
+ggcorrplot::ggcorrplot(cor_Extraversion, 
+                       type = "lower", 
+                       lab = TRUE) +
+  ggtitle("Correlation Matrix - Extraversion")
+
+# Heatmap for Neuroticism
+ggcorrplot::ggcorrplot(cor_Neuroticism, 
+                       type = "lower", 
+                       lab = TRUE) +
+  ggtitle("Correlation Matrix - Neuroticism")
+
+# Heatmap for Agreeableness
+ggcorrplot::ggcorrplot(cor_Agreeableness, 
+                       type = "lower", 
+                       lab = TRUE) +
+  ggtitle("Correlation Matrix - Agreeableness")
+
+# Heatmap for Conscientiousness
+ggcorrplot::ggcorrplot(cor_Conscientiousness, 
+                       type = "lower", 
+                       lab = TRUE) +
+  ggtitle("Correlation Matrix - Conscientiousness")
+
+# Heatmap for Openness
+ggcorrplot::ggcorrplot(cor_Openness, 
+                       type = "lower", 
+                       lab = TRUE) +
+  ggtitle("Correlation Matrix - Openness")
+
+
+```
